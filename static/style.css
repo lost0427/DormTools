@@ -1,0 +1,57 @@
+body{
+    background-color: #212121;
+}
+
+* {
+  color: #ECECEC;
+}
+
+input, button{
+    background-color: #2f2f2f;
+    border: none;
+    box-shadow: 0 0 0 0.2px #ECECEC;
+    color: #ECECEC;
+    border-radius: 7px;
+    padding: 5px;
+    outline: none;
+    caret-color: #ECECEC;
+}
+
+button{
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+input:-internal-autofill-previewed,input:-internal-autofill-selected {
+    -webkit-text-fill-color: #ECECEC !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+}
+
+form {
+  padding: 15px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+table, th, td{
+    border-collapse: collapse;
+    padding: 7px;
+    border: 0.1px solid;
+
+}
+
+table {
+    background-color: #2f2f2f;
+}
+
+@media screen and (max-width: 600px) {
+     /*针对最大宽度为 600px 的小屏幕设备的样式 */
+    input, button{
+        box-shadow: 0 0 0 1px #ECECEC;
+    }
+    table, th, td{
+        border: 1px solid;
+    }
+}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>控制面板</title>
+        <link rel="stylesheet" href="/static/style.css">
+
+</head>
+<body>
+    <h1>控制面板</h1>
+
+    <form id="control-form">
+        <label for="target_ip">目标 IP:</label>
+        <input type="text" id="target_ip" name="target_ip" required>
+
+        <label for="target_mac">目标 MAC:</label>
+        <input type="text" id="target_mac" name="target_mac" required>
+
+        <label for="gateway_ip">网关 IP:</label>
+        <input type="text" id="gateway_ip" name="gateway_ip" required>
+
+        <button type="button" id="startBtn" data-action="start">开始 ARP 欺骗</button>
+        <button type="button" id="stopBtn" data-action="stop">停止 ARP 欺骗</button>
+    </form>
+
+    <div id="status"></div>
+
+    <h2>网络设备列表</h2>
+    <table border="1" id="devices-table">
+        <thead>
+            <tr>
+                <th>IP 地址</th>
+                <th>MAC 地址</th>
+                <th>设备名称</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- 设备数据将由 JavaScript 动态填充 -->
+        </tbody>
+            <script src="/static/script.js"></script>
+
+    </table>
+
+    <h2>端口扫描</h2>
+    <input type="text" id="scan_ip" placeholder="输入要扫描的IP地址">
+    <button type="button" id="scanPortsBtn">扫描端口</button>
+    <div id="port-scan-results"></div>
+
+    <!-- 进度条显示 -->
+    <div id="progress-container" style="display: none;">
+        <label>扫描进度：</label>
+        <progress id="scan-progress" value="0" max="100"></progress>
+        <span id="progress-text">0%</span>
+    </div>
+</body>
+</html>
