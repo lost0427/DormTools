@@ -19,9 +19,8 @@ window.onload = function() {
     // 启动 ARP 欺骗
     document.getElementById('startBtn').addEventListener('click', () => {
         const targetIp = document.getElementById('target_ip').value;
-        const targetMac = document.getElementById('target_mac').value;
-        const gatewayIp = document.getElementById('gateway_ip').value;
-        sendControlRequest('start', targetIp, targetMac, gatewayIp);
+        // const targetMac = document.getElementById('target_mac').value;
+        sendControlRequest('start', targetIp);
     });
 
     // 停止 ARP 欺骗
@@ -81,15 +80,14 @@ window.onload = function() {
 };
 
 // 发送 ARP 欺骗控制请求
-function sendControlRequest(action, targetIp, targetMac, gatewayIp) {
+function sendControlRequest(action, targetIp) {
     fetch('/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             action: action,
             target_ip: targetIp,
-            target_mac: targetMac,
-            gateway_ip: gatewayIp
+            // target_mac: targetMac,
         })
     })
     .then(response => response.text())

