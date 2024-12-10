@@ -28,11 +28,12 @@ input:-internal-autofill-previewed,input:-internal-autofill-selected {
 }
 
 form {
-  padding: 15px;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 10px;
+    padding: 15px;
+    padding-bottom: 0!important;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 table, th, td{
@@ -46,6 +47,12 @@ table {
     background-color: #2f2f2f;
 }
 
+.annotation{
+    padding: 15px;
+    padding-top: 0!important;
+    font-size: x-small;
+}
+
 @media screen and (max-width: 600px) {
      /*针对最大宽度为 600px 的小屏幕设备的样式 */
     input, button{
@@ -53,5 +60,26 @@ table {
     }
     table, th, td{
         border: 1px solid;
+    }
+}
+
+/* 浅色模式 */
+@media (prefers-color-scheme: light) {
+    input, button{
+        background-color: #f1f1ff;
+        color: #080808;
+        caret-color: #080808;
+    }
+    * {
+        color: #080808;
+    }
+    body{
+        background-color: #f9f9f9;
+    }
+    table {
+        background-color: #f1f1ff;
+    }
+    input:-internal-autofill-previewed,input:-internal-autofill-selected {
+        -webkit-text-fill-color: #080808 !important;
     }
 }

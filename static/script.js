@@ -19,7 +19,6 @@ window.onload = function() {
     // 启动 ARP 欺骗
     document.getElementById('startBtn').addEventListener('click', () => {
         const targetIp = document.getElementById('target_ip').value;
-        // const targetMac = document.getElementById('target_mac').value;
         sendControlRequest('start', targetIp);
     });
 
@@ -77,6 +76,25 @@ window.onload = function() {
                 .catch(error => console.error('Error fetching scan progress:', error));
         }, 500);
     });
+
+    // 启动定时 ARP 欺骗
+    document.getElementById('startTimedARP').addEventListener('click', () => {
+        const duration = document.getElementById('arp_duration').value;
+
+        if (duration && !isNaN(duration) && duration > 0) {
+            const targetIp = document.getElementById('target_ip').value;
+
+            // 触发开始 ARP 欺骗
+            sendControlRequest('start', targetIp);
+
+            // 设置定时器，X分钟后自动停止 ARP 欺骗
+            setTimeout(() => {
+                sendControlRequest('stop');
+            }, duration * 60 * 1000);  // 转换分钟为毫秒
+        } else {
+            alert('请输入有效的时间（分钟）');
+        }
+    });
 };
 
 // 发送 ARP 欺骗控制请求
@@ -87,7 +105,6 @@ function sendControlRequest(action, targetIp) {
         body: new URLSearchParams({
             action: action,
             target_ip: targetIp,
-            // target_mac: targetMac,
         })
     })
     .then(response => response.text())

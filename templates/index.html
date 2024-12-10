@@ -11,19 +11,34 @@
     <h1>控制面板</h1>
 
     <form id="control-form">
-        <label for="target_ip">目标 IP:</label>
+        <label for="target_ip">目标 IP 主机位 :</label>
         <input type="text" id="target_ip" name="target_ip" required>
-
-        <label for="target_mac">目标 MAC:</label>
-        <input type="text" id="target_mac" name="target_mac" required>
-
-<!--        <label for="gateway_ip">网关 IP:</label>-->
-<!--        <input type="text" id="gateway_ip" name="gateway_ip" required>-->
 
         <button type="button" id="startBtn" data-action="start">开始 ARP 欺骗</button>
         <button type="button" id="stopBtn" data-action="stop">停止 ARP 欺骗</button>
     </form>
+    <span class="annotation" id="network-prefix">*主机位：{{ network_prefix }}xxx <--这部分</span><br>
 
+    <form>
+        <label>定时启动 ARP 欺骗</label>
+        <label>（ 请先填写主机位 ）</label>
+    </form>
+
+    <form id="timed-arp-form">
+        <label for="arp_duration">定时持续时间 (分钟): </label>
+        <input type="number" id="arp_duration" name="arp_duration" min="1" required>
+        <button type="button" id="startTimedARP">开始定时 ARP 欺骗</button>
+    </form>
+
+    <div id="status"></div>
+
+    <script>
+        function submitTargetIP() {
+            const networkPrefix = document.getElementById('network-prefix').innerText;
+            const targetIP = document.getElementById('target-ip').value;
+            alert(`Full Target IP: ${networkPrefix}${targetIP}`);
+        }
+    </script>
     <div id="status"></div>
 
     <h2>网络设备列表</h2>

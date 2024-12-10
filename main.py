@@ -3,10 +3,11 @@ import os
 from flask import Flask, render_template, request, jsonify
 import threading
 import socket
-from scapy.all import ARP, Ether, sendp, srp1, get_if_hwaddr, conf
+from scapy.all import *
 import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import ipaddress
 
 app = Flask(__name__)
 
@@ -150,6 +151,52 @@ scan_total_ports = 65535
 scan_lock = threading.Lock()
 
 
+def get_hostname(ip):
+    """
+    获取 IP 对应的主机名
+    """
+    try:
+        hostname = socket.gethostbyaddr(ip)[0]  # 通过 DNS 反向解析
+    except socket.herror:
+        hostname = None  # 如果解析失败，返回 None
+    return hostname
+
+
+def scan_network_with_arp(network):
+    """
+    使用批量 ARP 请求扫描网络，并尝试获取主机名
+    """
+    start_time = time.time()  # 记录开始时间
+
+    devices = []
+    network1 = ipaddress.ip_network(network, strict=False)
+
+    # 构造 ARP 广播包
+    arp_pkt = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(network1))
+    results, _ = srp(arp_pkt, timeout=1, verbose=0)  # 批量发送 ARP 请求
+
+    for _, recv_pkt in results:
+        ip = recv_pkt.psrc  # 获取 IP 地址
+        mac = recv_pkt.hwsrc  # 获取 MAC 地址
+
+        # 尝试解析主机名
+        hostname = get_hostname(ip)
+
+        # 打印发现的信息
+        print(f"Active: {ip}, MAC: {mac}, Hostname: {hostname}")
+
+        # 保存到设备列表
+        devices.append({
+            'ip': ip,
+            'mac': mac,
+            'hostname': hostname
+        })
+    end_time = time.time()  # 记录结束时间
+    elapsed_time = end_time - start_time  # 计算扫描用时
+    logging.info(f"Network scan completed in {elapsed_time:.2f} seconds.")  # 打印用时
+    return devices
+
+
 # 单个端口扫描任务
 def scan_port(ip, port):
     global scan_progress
@@ -196,7 +243,8 @@ def api_scan_ports():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    network_prefix = network.rsplit('.', 1)[0] + '.'
+    return render_template('index.html', network_prefix=network_prefix)
 
 
 @app.route('/control', methods=['POST'])
@@ -208,12 +256,18 @@ def control():
         if arp_spoofing_active:
             return 'ARP Spoofing is already running!'
 
-        # 获取输入的目标 IP、目标 MAC 和网关 IP
-        target_ip = request.form.get('target_ip')
+        # 获取输入的目标 IP 的最后一部分
+        target_ip_suffix = request.form.get('target_ip')
+        if not target_ip_suffix or not target_ip_suffix.isdigit() or not (1 <= int(target_ip_suffix) <= 254):
+            return 'Invalid target IP. Please enter the last segment of the IP address (1-254).'
+
+        # 拼接完整的目标 IP 地址
+        target_ip = f"{network.rsplit('.', 1)[0]}.{target_ip_suffix}"
+
+        # 获取默认网卡和本机 MAC 地址
         interface = get_default_interface()
         local_mac = get_local_mac(interface)
         target_mac = get_mac(target_ip)
-
         if not target_mac:
             return 'Unable to obtain target MAC address. Please check the IP address.'
 
@@ -242,6 +296,7 @@ def control():
 def api_devices():
     # 扫描网络设备并返回 JSON 格式数据
     network_devices = scan_network(network)
+    # network_devices = scan_network_with_arp(network)
     return jsonify(network_devices)
 
 
