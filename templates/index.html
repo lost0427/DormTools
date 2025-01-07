@@ -14,6 +14,9 @@
         <label for="target_ip">目标 IP 主机位 :</label>
         <input type="text" id="target_ip" name="target_ip" required>
 
+        <label for="target_mac">目标 MAC 地址 (可选):</label>
+        <input type="text" id="target_mac" placeholder="留空则自动获取">
+
         <button type="button" id="startBtn" data-action="start">开始 ARP 欺骗</button>
         <button type="button" id="stopBtn" data-action="stop">停止 ARP 欺骗</button>
     </form>

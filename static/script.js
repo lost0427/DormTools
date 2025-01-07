@@ -99,12 +99,14 @@ window.onload = function() {
 
 // 发送 ARP 欺骗控制请求
 function sendControlRequest(action, targetIp) {
+    const targetMac = document.getElementById('target_mac').value; // 获取用户输入的 MAC 地址
     fetch('/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             action: action,
             target_ip: targetIp,
+            target_mac: targetMac, // 添加目标 MAC 地址
         })
     })
     .then(response => response.text())
@@ -116,3 +118,4 @@ function sendControlRequest(action, targetIp) {
         console.error('Error during ARP Spoofing request:', error);
     });
 }
+

