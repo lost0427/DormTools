@@ -23,9 +23,17 @@
 
 ## 使用方法
 
+###
+需要先下载 Nmap 和 Npcap 。 <br>
+以下是作者使用的版本 （目前的最新版本）- 下载地址 <br>
+https://nmap.org/dist/nmap-7.95-setup.exe <br>
+https://npcap.com/dist/npcap-1.80.exe
+
 ### 一键启动
 
 下载 release 中自己操作系统对应的程序，双击启动
+
+默认运行在0.0.0.0:5000
 
 ### 手动部署
 
