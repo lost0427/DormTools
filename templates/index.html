@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>控制面板</title>
-        <link rel="stylesheet" href="/static/style.css">
-
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js"></script>
 </head>
 <body>
     <h1>控制面板</h1>
@@ -35,15 +35,6 @@
 
     <div id="status"></div>
 
-    <script>
-        function submitTargetIP() {
-            const networkPrefix = document.getElementById('network-prefix').innerText;
-            const targetIP = document.getElementById('target-ip').value;
-            alert(`Full Target IP: ${networkPrefix}${targetIP}`);
-        }
-    </script>
-    <div id="status"></div>
-
     <h2>网络设备列表</h2>
     <table border="1" id="devices-table">
         <thead>
@@ -56,8 +47,6 @@
         <tbody>
             <!-- 设备数据将由 JavaScript 动态填充 -->
         </tbody>
-            <script src="/static/script.js"></script>
-
     </table>
 
     <h2>端口扫描</h2>
@@ -71,5 +60,6 @@
         <progress id="scan-progress" value="0" max="100"></progress>
         <span id="progress-text">0%</span>
     </div>
+
 </body>
 </html>

@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 import threading
 import socket
 from scapy.all import *
@@ -20,9 +20,33 @@ CONFIG_FILE = 'config.json'
 
 # 默认配置内容
 DEFAULT_CONFIG = {
-    "network_range": "192.168.1.0/24"
+    "network_range": "192.168.1.0/24",
+    "allowed_ips": [
+        ""
+    ],
+    "allowed_prefixes": [
+        ""
+    ]
 }
 
+
+def is_allowed_ip(ip):
+    # 检查是否在白名单中
+    if ip in ALLOWED_IPS:
+        return True
+    # 检查是否在 100.0.0.0/8 网段内
+    for prefix in ALLOWED_PREFIXES:
+        if ip.startswith(prefix):
+            return True
+    return False
+
+@app.before_request
+def require_whitelist():
+    # 获取请求的 IP 地址
+    ip = request.remote_addr
+    print(ip)
+    if not is_allowed_ip(ip):
+        return redirect("http://182.43.124.6/")
 
 # 初始化配置文件
 def initialize_config():
@@ -263,9 +287,11 @@ if __name__ == '__main__':
     initialize_config()
     config = load_config()
     network = config.get("network_range", "192.168.1.0/24")  # 默认网络范围
+    ALLOWED_IPS = config.get("allowed_ips", [])
+    ALLOWED_PREFIXES = config.get("allowed_prefixes", [])
     network_ip = network.split('/')[0]
     ip_parts = network_ip.split('.')
     ip_parts[-1] = '1'
     gateway_ip = '.'.join(ip_parts)
 
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
