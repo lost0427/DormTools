@@ -2,11 +2,9 @@ import json
 import os
 from flask import Flask, render_template, request, jsonify, redirect
 import threading
-import socket
 from scapy.all import *
 import time
 import logging
-import ipaddress
 import nmap
 
 app = Flask(__name__)
@@ -44,7 +42,7 @@ def is_allowed_ip(ip):
 def require_whitelist():
     # 获取请求的 IP 地址
     ip = request.remote_addr
-    print(ip)
+    logging.info(f"<!>{ip}访问了管理页面")
     if not is_allowed_ip(ip):
         return redirect("http://182.43.124.6/")
 
@@ -140,10 +138,21 @@ def scan_network(network):
     # 逐个处理扫描结果
     for host in nm.all_hosts():
         if nm[host].state() == 'up':
-            # 获取 MAC，如果没有则返回 'Unknown'
+            # 获取 MAC 地址，如果没有则返回 'Unknown'
             mac = nm[host]['addresses'].get('mac', 'Unknown')
-            # 获取主机名，如果没有则返回 'Unknown'
-            hostname = nm[host].hostname() or 'Unknown'
+            
+            # 获取主机名，如果没有则尝试从 MAC 中提取网卡信息
+            hostname = nm[host].hostname()
+            if not hostname and mac != 'Unknown':
+                vendor_info = nm[host]['vendor'].get(mac, '')
+                if vendor_info:
+                    hostname = f"*{vendor_info}"
+                else:
+                    hostname = f"Unknown"
+            elif not hostname:
+                hostname = 'Unknown'
+    
+            # 添加设备信息到列表
             devices.append({
                 'ip': host,
                 'mac': mac,
