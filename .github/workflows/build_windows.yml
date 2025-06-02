@@ -22,7 +22,7 @@ jobs:
           $utcTime = (Get-Date).ToUniversalTime()
           $beijingTime = $utcTime.AddHours(8)
           $timestamp = $beijingTime.ToString("yyyyMMdd_HHmm")
-          echo "::set-output name=timestamp::$timestamp"
+          echo "timestamp=$timestamp" >> $env:GITHUB_OUTPUT
 
       - name: 安装 UPX
         uses: crazy-max/ghaction-upx@v3
