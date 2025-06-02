@@ -36,7 +36,6 @@ jobs:
           spec: 'main.py'
           requirements: 'requirements.txt'
           options: --onefile, --windowed, --add-data "static;static", --add-data "templates;templates", --upx-dir "C:\\Program Files\\UPX", --name "Dormtools_${{ steps.vars.outputs.timestamp }}"
-          upload_exe_with_name: Dormtools-${{ steps.vars.outputs.timestamp }}
           clean_checkout: false
 
       - name: 查看 dist 目录内容
