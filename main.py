@@ -208,6 +208,15 @@ def scan_ports(ip, start_port=1, end_port=65535):
     return open_ports
 
 
+def clear_log_file(log_file="app.log"):
+    try:
+        with open(log_file, "w", encoding="utf-8") as f:
+            pass  # 清空文件内容
+        print(f"{log_file} 已清空。")
+    except Exception as e:
+        print(f"无法清空 {log_file}: {e}")
+
+
 @app.route('/api/scan_ports', methods=['POST'])
 def api_scan_ports():
     """
@@ -302,6 +311,7 @@ def api_devices():
 if __name__ == '__main__':
     # 在应用启动时初始化配置
     initialize_config()
+    clear_log_file()
     config = load_config()
     network = config.get("network_range", "192.168.1.0/24")  # 默认网络范围
     ALLOWED_IPS = config.get("allowed_ips", [])
