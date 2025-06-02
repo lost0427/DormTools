@@ -64,9 +64,13 @@ def load_config():
 
 # 配置日志
 logging.basicConfig(
-    format='%(asctime)s - %(message)s',  # 时间戳和消息
+    format='%(asctime)s - %(levelname)s - %(message)s',  # 时间戳、日志级别和消息
     level=logging.INFO,  # 设置日志级别
-    datefmt='%Y-%m-%d %H:%M:%S'  # 时间格式
+    datefmt='%Y-%m-%d %H:%M:%S',  # 时间格式
+    handlers=[
+        logging.FileHandler("app.log", encoding="utf-8", mode="a"),  # 使用 UTF-8 编码保存日志文件
+        logging.StreamHandler()
+    ]
 )
 
 
@@ -129,10 +133,14 @@ def scan_network(network):
     devices = []
 
     try:
+        logging.info(f"尝试使用 Nmap 扫描网络: {network}")
         # -sn 表示只进行主机发现（Ping 扫描），-T4 提高扫描速度
         nm.scan(hosts=network, arguments='-sn -T4')
+    except nmap.PortScannerError as e:
+        logging.error(f"Nmap 扫描失败: {e}", exc_info=True)
+        return devices
     except Exception as e:
-        logging.error(f"扫描网络时出错: {e}")
+        logging.error(f"未知错误在扫描网络时发生: {e}", exc_info=True)
         return devices
 
     # 逐个处理扫描结果
