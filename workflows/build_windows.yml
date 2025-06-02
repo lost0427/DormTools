@@ -1,0 +1,54 @@
+name: Win编译
+
+on:
+  workflow_dispatch:   # 手动触发
+  push:
+    branches:
+      - main           # 可选：推送时自动构建
+
+permissions:
+  contents: read
+
+jobs:
+  pyinstaller-build:
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置时间戳（北京时间）
+        id: vars
+        run: |
+          $utcTime = (Get-Date).ToUniversalTime()
+          $beijingTime = $utcTime.AddHours(8)
+          $timestamp = $beijingTime.ToString("yyyyMMdd_HHmm")
+          echo "::set-output name=timestamp::$timestamp"
+
+      - name: 安装 UPX
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          install-only: true
+
+      - name: 创建可执行文件（启用 UPX 压缩）
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          python_ver: '3.11'
+          spec: 'main.py'
+          requirements: 'requirements.txt'
+          options: |
+            --onefile
+            --windowed
+            --add-data "static;static"
+            --add-data "templates;templates"
+            --upx-dir "C:\\Program Files\\UPX"
+            --name "Dormtools_${{ steps.vars.outputs.timestamp }}"
+          clean_checkout: false
+
+      - name: 查看 dist 目录内容
+        run: dir dist\
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dormtools-${{ steps.vars.outputs.timestamp }}
+          path: dist/Dormtools_*.exe
